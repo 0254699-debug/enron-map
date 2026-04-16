@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Enron — Case Study</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#0D0508;overflow:hidden;height:100vh;width:100vw;color:#fff}
+#tabnav{position:fixed;top:0;left:0;right:0;height:52px;background:rgba(13,5,8,.98);border-bottom:1px solid rgba(192,0,42,.3);display:flex;align-items:center;gap:0;z-index:300;padding:0 16px;justify-content:space-between}
+.tabtitle{font-size:13px;font-weight:500;color:#C08080;flex-shrink:0;margin-right:16px}
+.tabs{display:flex;gap:6px}
+.tabbt{padding:7px 18px;border-radius:7px;border:1px solid rgba(192,0,42,.3);background:transparent;color:#7A5050;font-size:12px;font-weight:500;cursor:pointer;transition:all .2s}
+.tabbt:hover{background:rgba(192,0,42,.15);color:#C08080}
+.tabbt.active{background:rgba(139,0,18,.85);border-color:#C0002A;color:#fff}
+.tabcont{position:fixed;top:52px;left:0;right:0;bottom:0;display:none}
+.tabcont.shown{display:block}
+/* ── MAP STYLES ── */
+#map-wrap{position:relative;width:100%;height:100%;overflow:hidden}
+#map-bar{position:absolute;top:0;left:0;right:0;height:44px;background:rgba(13,5,8,.92);border-bottom:1px solid rgba(192,0,42,.2);display:flex;align-items:center;justify-content:flex-end;padding:0 12px;gap:6px;z-index:200}
+.mbtn{padding:5px 12px;border-radius:6px;border:none;font-size:10.5px;cursor:pointer;font-weight:500}
+.mbtn-o{background:transparent;border:1px solid rgba(192,0,42,.4);color:#B07070}
+.mbtn-o:hover{background:rgba(192,0,42,.15)}
+.mbtn-s{background:rgba(139,0,18,.8);color:#fff}
+.mbtn-s:hover{background:#C0002A}
+#chart{position:absolute;top:44px;left:0;right:0;bottom:0;width:100%;height:calc(100% - 44px);cursor:grab}
+#chart:active{cursor:grabbing}
+.link{fill:none}
+.node{cursor:pointer}
+.node rect{rx:7}
+.node:hover rect{filter:brightness(1.3)}
+#mpanel{position:absolute;right:14px;bottom:14px;width:300px;background:rgba(16,4,8,.97);border:1px solid rgba(192,0,42,.3);border-radius:11px;padding:15px 16px 16px;display:none;z-index:200;max-height:44vh;overflow-y:auto}
+#mpanel .badge{display:inline-block;padding:3px 9px;border-radius:20px;font-size:10px;font-weight:500;margin-bottom:9px;letter-spacing:.04em}
+#mpanel h3{font-size:13px;font-weight:500;color:#fff;margin-bottom:4px;line-height:1.4}
+#mpanel .role{font-size:11px;color:#A07070;font-style:italic;margin-bottom:9px;line-height:1.4}
+#mpanel .detail{font-size:11.5px;color:#9A8585;line-height:1.6}
+#mpanel .px{position:absolute;top:9px;right:12px;background:none;border:none;color:#604040;cursor:pointer;font-size:18px;line-height:1}
+#mleg{position:absolute;bottom:14px;left:14px;display:flex;flex-direction:column;gap:5px;z-index:200}
+.li{display:flex;align-items:center;gap:6px;font-size:10px;color:#6A5050}
+.ls{width:9px;height:9px;border-radius:2px;flex-shrink:0}
+/* ── TIMELINE STYLES ── */
+#tl-wrap{width:100%;height:100%;overflow-y:auto;overflow-x:hidden;padding:20px 0 60px}
+#tl-wrap::-webkit-scrollbar{width:4px}
+#tl-wrap::-webkit-scrollbar-track{background:transparent}
+#tl-wrap::-webkit-scrollbar-thumb{background:#3A1515;border-radius:2px}
+.tl-header{text-align:center;padding:24px 20px 32px;max-width:700px;margin:0 auto}
+.tl-header h2{font-size:28px;font-weight:500;font-family:Georgia,serif;color:#fff;margin-bottom:8px}
+.tl-header p{font-size:13px;color:#7A5050;line-height:1.6}
+.tl-phases{display:flex;gap:10px;justify-content:center;margin-top:16px;flex-wrap:wrap}
+.phase-pill{padding:4px 12px;border-radius:20px;font-size:10px;font-weight:500;letter-spacing:.04em}
+.timeline{position:relative;max-width:820px;margin:0 auto;padding:0 20px}
+.tl-spine{position:absolute;left:50%;top:0;bottom:0;width:2px;background:rgba(192,0,42,.35);transform:translateX(-50%)}
+.tl-year-marker{position:relative;display:flex;justify-content:center;margin:8px 0}
+.tl-year-marker span{background:#C0002A;color:#fff;padding:3px 12px;border-radius:20px;font-size:11px;font-weight:500;letter-spacing:.05em;z-index:2;position:relative}
+.ev{position:relative;display:flex;align-items:flex-start;margin:6px 0}
+.ev.left{flex-direction:row;padding-right:calc(50% + 22px)}
+.ev.right{flex-direction:row-reverse;padding-left:calc(50% + 22px)}
+.ev-dot{position:absolute;left:50%;top:18px;width:12px;height:12px;border-radius:50%;border:2px solid;transform:translateX(-50%);z-index:2;flex-shrink:0;transition:transform .2s}
+.ev:hover .ev-dot{transform:translateX(-50%) scale(1.4)}
+.ev-card{background:rgba(20,8,12,.85);border:1px solid rgba(255,255,255,.07);border-radius:9px;padding:13px 15px;cursor:pointer;transition:border-color .2s,background .2s;width:100%}
+.ev-card:hover{border-color:rgba(192,0,42,.4);background:rgba(28,8,14,.95)}
+.ev-card.expanded{border-color:rgba(192,0,42,.5)}
+.ev-date{font-size:10px;font-weight:500;letter-spacing:.05em;margin-bottom:5px}
+.ev-title{font-size:13px;font-weight:500;color:#F0D0D0;margin-bottom:5px;line-height:1.35}
+.ev-short{font-size:11.5px;color:#8A6060;line-height:1.5}
+.ev-detail{font-size:11.5px;color:#A08080;line-height:1.6;margin-top:10px;padding-top:10px;border-top:1px solid rgba(255,255,255,.07);display:none}
+.ev-card.expanded .ev-detail{display:block}
+.ev-toggle{font-size:10px;color:#7A4040;margin-top:6px;display:inline-block}
+/* Phase colors */
+.ph-growth .ev-dot{background:#1C2B5A;border-color:#378ADD}
+.ph-growth .ev-date{color:#5888D8}
+.ph-warning .ev-dot{background:#5A3800;border-color:#BA7517}
+.ph-warning .ev-date{color:#BA7517}
+.ph-collapse .ev-dot{background:#6B0010;border-color:#E24B4A}
+.ph-collapse .ev-date{color:#E24B4A}
+.ph-aftermath .ev-dot{background:#2A1858;border-color:#7F77DD}
+.ph-aftermath .ev-date{color:#9F99E8}
+@media(max-width:640px){
+  .ev.left,.ev.right{flex-direction:row;padding-right:0;padding-left:44px}
+  .ev-dot{left:16px;transform:none}
+  .ev:hover .ev-dot{transform:scale(1.3)}
+  .tl-spine{left:22px}
+  .tl-year-marker{justify-content:flex-start;padding-left:6px}
+}
+</style>
+</head>
+<body>
+
+<div id="tabnav">
+  <span class="tabtitle">Enron Case Study</span>
+  <div class="tabs">
+    <button id="btn-map" class="tabbt active" onclick="showTab('map')">Stakeholder Map</button>
+    <button id="btn-tl" class="tabbt" onclick="showTab('tl')">Timeline of Events</button>
+  </div>
+</div>
+
+<!-- MAP TAB -->
+<div id="tab-map" class="tabcont shown">
+  <div id="map-wrap">
+    <div id="map-bar">
+      <button class="mbtn mbtn-o" onclick="expandAll()">Expand all</button>
+      <button class="mbtn mbtn-o" onclick="collapseAll()">Collapse all</button>
+      <button class="mbtn mbtn-s" onclick="resetView()">Reset view</button>
+    </div>
+    <svg id="chart"></svg>
+    <div id="mpanel">
+      <button class="px" onclick="document.getElementById('mpanel').style.display='none'">x</button>
+      <span id="pb" class="badge"></span>
+      <h3 id="pn"></h3>
+      <div id="pr" class="role"></div>
+      <div id="pd" class="detail"></div>
+    </div>
+    <div id="mleg">
+      <div class="li"><div class="ls" style="background:#7A0010"></div>Enron</div>
+      <div class="li"><div class="ls" style="background:#1C2B5A"></div>Internal</div>
+      <div class="li"><div class="ls" style="background:#0F6E56"></div>Ext. active</div>
+      <div class="li"><div class="ls" style="background:#3D3080"></div>Ext. passive</div>
+      <div class="li"><div class="ls" style="background:#C0002A;outline:2px solid rgba(255,100,100,.5);outline-offset:1px"></div>Key player</div>
+    </div>
+  </div>
+</div>
+
+<!-- TIMELINE TAB -->
+<div id="tab-tl" class="tabcont">
+  <div id="tl-wrap">
+    <div class="tl-header">
+      <h2>Enron — Timeline of Events</h2>
+      <p>From founding in 1985 to the final sentencing in 2006. Click any event to expand full details.</p>
+      <div class="tl-phases">
+        <span class="phase-pill" style="background:#0C1A42;color:#85B7EB">Growth 1985–1999</span>
+        <span class="phase-pill" style="background:#4A2800;color:#EF9F27">Warning signs 2000–2001</span>
+        <span class="phase-pill" style="background:#5A0010;color:#F09595">Collapse 2001</span>
+        <span class="phase-pill" style="background:#1E1040;color:#AFA9EC">Aftermath 2002–2006</span>
+      </div>
+    </div>
+    <div class="timeline">
+      <div class="tl-spine"></div>
+      <div id="tl-events"></div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+<script>
+
+// ══════════════════════════════════════
+// TAB SWITCHING
+// ══════════════════════════════════════
+let mapReady=false;
+function showTab(t){
+  document.getElementById("tab-map").classList.toggle("shown",t==="map");
+  document.getElementById("tab-tl").classList.toggle("shown",t==="tl");
+  document.getElementById("btn-map").classList.toggle("active",t==="map");
+  document.getElementById("btn-tl").classList.toggle("active",t==="tl");
+  if(t==="map"&&!mapReady){initMap();mapReady=true;}
+  if(t==="tl"){buildTimeline();}
+}
+
+// ══════════════════════════════════════
+// TIMELINE
+// ══════════════════════════════════════
+const EVENTS=[
+ {date:"1985",phase:"growth",title:"Enron founded",
+  short:"Merger of Houston Natural Gas and InterNorth creates Enron.",
+  detail:"Kenneth Lay orchestrated the merger of Houston Natural Gas and InterNorth, creating Enron Corp and becoming its first CEO. The company began as a straightforward natural gas pipeline operator — a regulated, stable business moving gas through pipes across the US."},
+ {date:"1986",phase:"growth",title:"Kenneth Lay becomes Chairman & CEO",
+  short:"Lay consolidates leadership of the new company.",
+  detail:"Lay moved quickly to consolidate control, positioning himself as both Chairman and CEO. He began reshaping Enron's culture around aggressive growth and innovation — characteristics that would define the company for the next 15 years."},
+ {date:"1990",phase:"growth",title:"Jeffrey Skilling joins Enron",
+  short:"McKinsey consultant joins full-time, brings 'Gas Bank' concept.",
+  detail:"Skilling joined as head of Enron Finance after working as a McKinsey consultant. He brought the revolutionary 'Gas Bank' concept — the idea that Enron could act as a financial intermediary in energy markets, buying and selling gas contracts the way Wall Street traded securities. This was the seed of what Enron would become."},
+ {date:"1992",phase:"growth",title:"Mark-to-market accounting approved",
+  short:"SEC approves Enron's use of mark-to-market accounting for energy contracts.",
+  detail:"This was a pivotal moment. Mark-to-market accounting allowed Enron to book the estimated total profit of a long-term contract on the day it was signed — even if that cash wouldn't arrive for years, and even if the estimate was wildly optimistic. It created an incentive to sign deals and book revenue immediately, regardless of economic reality."},
+ {date:"1993",phase:"growth",title:"Enron International launches",
+  short:"Rebecca Mark leads aggressive global expansion into power and infrastructure.",
+  detail:"Under Rebecca Mark, Enron began building power plants and infrastructure projects across the developing world — India, Brazil, the Philippines, and elsewhere. The signature project was the Dabhol power plant in Maharashtra, India — a $3B investment that would later become one of the most controversial foreign investments in Indian history."},
+ {date:"1996",phase:"growth",title:"Fortune names Enron Most Innovative",
+  short:"First of six consecutive 'Most Innovative Company' awards from Fortune magazine.",
+  detail:"Fortune magazine named Enron America's Most Innovative Company in 1996 — the first of six consecutive years it would receive this award. Wall Street loved Enron. Analysts praised it. The press celebrated it. This public adoration created enormous pressure on management to maintain the appearance of extraordinary performance."},
+ {date:"1997",phase:"warning",title:"First SPE: Chewco created",
+  short:"First Special Purpose Entity set up to hide debt off Enron's balance sheet.",
+  detail:"Fastow helped create Chewco Investments — one of the first Special Purpose Entities (SPEs) designed to keep debt off Enron's books. The SPE structure worked by creating a legally separate entity that could hold Enron's bad assets and debt. As long as an outside investor held 3% of the equity, accounting rules allowed Enron to exclude it from consolidated financials. The problem: Chewco's outside investors were secretly funded by Enron itself — violating the rules entirely."},
+ {date:"1999",phase:"warning",title:"Fastow creates LJM entities",
+  short:"Fastow creates LJM1 and LJM2, SPEs that personally enrich him.",
+  detail:"Andrew Fastow created LJM Cayman and LJM2 Co-Investment — two partnerships named after his wife (Lea) and children (Jeffrey and Matthew). These were designed to be counterparties to Enron deals, allowing Enron to offload underperforming assets and book gains. Fastow served on both sides of every transaction — as Enron's CFO negotiating with himself as the fund manager. He personally earned over $30M from these entities. This was a textbook conflict of interest that the board approved."},
+ {date:"Jan 2000",phase:"warning",title:"Enron stock peaks at $90.75",
+  short:"All-time high. Market cap reaches $70B. Company appears unstoppable.",
+  detail:"Enron's stock hit its all-time high of $90.75 per share in January 2000, giving it a market capitalization of nearly $70 billion. The company was widely considered one of the best-run businesses in America. Employees, encouraged by management, held the majority of their retirement savings in Enron stock. Few suspected anything was wrong."},
+ {date:"2000",phase:"warning",title:"California energy crisis begins",
+  short:"Enron traders manipulate California electricity markets using 'Death Star' and 'Fat Boy' strategies.",
+  detail:"As California's electricity market deregulated, Enron traders began deliberately manipulating prices using strategies with internal names like 'Death Star,' 'Fat Boy,' 'Ricochet,' and 'Get Shorty.' These involved creating artificial power shortages, moving electricity out of state and back to collect inflated prices, and overloading transmission lines to claim congestion payments. Electricity prices rose 800%. Rolling blackouts hit millions of Californians. Recorded calls later revealed traders laughing about 'stealing from grandma Millie' — a reference to elderly consumers on fixed incomes."},
+ {date:"Nov 2000",phase:"warning",title:"Jim Chanos begins shorting Enron",
+  short:"Short seller reads Enron's public SEC filings and concludes the company is a fraud.",
+  detail:"Jim Chanos of Kynikos Associates read Enron's publicly available SEC filings and concluded the company was fraudulent — specifically noting that Enron's disclosed rate of return on invested capital was far below its cost of capital, meaning it was destroying value while claiming to create it. He began shorting Enron stock in November 2000, over a year before the collapse. His analysis showed that the fraud was visible to anyone who carefully read the footnotes of Enron's own public disclosures."},
+ {date:"Feb 2001",phase:"warning",title:"Skilling becomes CEO",
+  short:"Lay steps back to Chairman. Skilling takes full operational control.",
+  detail:"Jeffrey Skilling formally became CEO in February 2001, with Lay remaining as Executive Chairman. At this point the financial structures holding up Enron's reported performance were becoming increasingly fragile — assets were underperforming, the SPE structures required the stock price to stay above certain thresholds to remain viable, and cash flow was dangerously disconnected from reported earnings."},
+ {date:"Mar 2001",phase:"warning",title:"Bethany McLean: 'Is Enron Overpriced?'",
+  short:"First mainstream media skepticism. Enron executives fly to New York to pressure her editor.",
+  detail:"Fortune magazine journalist Bethany McLean published an article asking 'Is Enron Overpriced?' — noting that despite its sky-high valuation, she couldn't figure out exactly how Enron made its money. Enron executives, including Skilling, flew to New York to personally pressure her editor. Skilling called McLean 'unethical.' Her editors stood behind her. She was completely right. The article was later recognized as the first public crack in Enron's public image."},
+ {date:"Aug 14, 2001",phase:"collapse",title:"Skilling resigns without warning",
+  short:"Resigns citing 'personal reasons' after only 6 months as CEO.",
+  detail:"Jeffrey Skilling suddenly resigned as CEO on August 14, 2001 — just six months after taking the top job — citing vague 'personal reasons.' The shock announcement sent Enron's stock down 7% in a single day. Internally, many knew the structures Skilling had built were failing. He sold $60M in Enron stock before and during his tenure. Kenneth Lay returned as CEO."},
+ {date:"Aug 22, 2001",phase:"collapse",title:"Sherron Watkins memo to Lay",
+  short:"VP warns Lay the company could 'implode in a wave of accounting scandals.'",
+  detail:"Sherron Watkins, a Vice President at Enron, sent a detailed anonymous memo to Kenneth Lay warning that Enron 'might implode in a wave of accounting scandals.' She described specific SPE structures and the accounting problems they created. She then met with Lay directly and was told the issues would be investigated. Vinson & Elkins conducted that investigation and — in a deeply conflicted move — cleared Enron. Watkins went to Lay, not to external regulators, which limited the impact of her warning."},
+ {date:"Oct 16, 2001",phase:"collapse",title:"Enron announces $618M quarterly loss",
+  short:"Plus $1.2B equity writedown. First public admission of serious financial problems.",
+  detail:"Enron announced a third-quarter loss of $618 million and a $1.2 billion reduction in shareholder equity — the first major public admission that something was seriously wrong. The company attributed the equity charge to 'early termination' of certain SPE structures. Analysts and investors were confused and alarmed. This was the beginning of the end."},
+ {date:"Oct 22, 2001",phase:"collapse",title:"SEC opens formal investigation",
+  short:"Securities and Exchange Commission begins formal inquiry into SPE transactions.",
+  detail:"The SEC sent Enron a letter requesting information about its SPE transactions and related-party deals. This was a formal investigation, not an informal inquiry. The announcement further hammered Enron's stock. Within days, it was clear the company's financial reporting had been fundamentally dishonest for years."},
+ {date:"Nov 8, 2001",phase:"collapse",title:"Enron restates earnings to 1997",
+  short:"Admits earnings were overstated by $586M over 4 years. Chewco exposed.",
+  detail:"Enron filed amended financial statements with the SEC, restating its earnings from 1997 through 2001 — admitting that $586 million in previously reported earnings had never actually existed. The restatement revealed that Chewco, the first major SPE, had been improperly structured, and that Fastow's LJM entities had been used to manipulate Enron's financial results. The scale of the fraud was becoming clear."},
+ {date:"Nov 28, 2001",phase:"collapse",title:"Credit rating downgraded to junk",
+  short:"Moody's and S&P cut Enron to below investment grade. Merger with Dynegy collapses.",
+  detail:"Moody's and S&P both cut Enron's credit rating to junk status on November 28 — just 4 days before bankruptcy. This triggered billions in debt repayment obligations that Enron could not meet. On the same day, Dynegy — which had been in merger talks with Enron — pulled out of the deal. With no merger and no access to credit markets, bankruptcy became inevitable within hours."},
+ {date:"Dec 2, 2001",phase:"collapse",title:"Enron files for bankruptcy",
+  short:"Largest US bankruptcy in history at the time. $63.4B in assets. 29,000 jobs lost.",
+  detail:"Enron Corporation filed for Chapter 11 bankruptcy protection on December 2, 2001 — at the time, the largest bankruptcy in US history, with $63.4 billion in assets. 29,000 people lost their jobs. Employee pension funds holding Enron stock lost $1.2 billion. Shareholders lost $74 billion in market value. The collapse happened in under two months from the first public disclosure of problems."},
+ {date:"Jan 2002",phase:"aftermath",title:"Document shredding revealed",
+  short:"Arthur Andersen admits destroying Enron-related documents after SEC investigation began.",
+  detail:"Arthur Andersen publicly admitted that employees had shredded large quantities of Enron-related documents after learning of the SEC investigation in October 2001. The destruction continued even after the SEC issued a formal document preservation order. David Duncan, the lead Andersen partner on the Enron engagement, had ordered the shredding. The revelation was catastrophic for Andersen's reputation and immediately raised questions about obstruction of justice."},
+ {date:"Jun 2002",phase:"aftermath",title:"Arthur Andersen convicted",
+  short:"Convicted of obstruction of justice. Loses CPA license. 89,000 employees lose jobs.",
+  detail:"Arthur Andersen was convicted of obstruction of justice for the document shredding. The conviction required the firm to surrender its CPA license, effectively ending its existence. 89,000 employees worldwide — the vast majority of whom had nothing to do with Enron — lost their jobs. The Supreme Court later unanimously overturned the conviction in 2005, finding the jury instructions were flawed, but by then the firm was gone and could not be reconstituted."},
+ {date:"Jul 2002",phase:"aftermath",title:"Sarbanes-Oxley Act signed into law",
+  short:"Most significant US corporate governance reform in decades. Written almost entirely in response to Enron.",
+  detail:"President Bush signed the Sarbanes-Oxley Act (SOX) into law on July 30, 2002. Written in direct response to Enron and WorldCom, SOX fundamentally reshaped US corporate governance: CEOs and CFOs must personally certify financial statements (false certification = criminal liability); auditors are now overseen by the PCAOB rather than self-regulating; audit committees must be independent; whistleblowers get federal legal protection; retaliation against whistleblowers is a federal crime. Every public company executive today operates under legal requirements created because of what Enron did."},
+ {date:"2003",phase:"aftermath",title:"Ben Glisan: first Enron executive jailed",
+  short:"Treasurer pleads guilty to conspiracy. Sentenced to 5 years.",
+  detail:"Ben Glisan, Enron's former Treasurer, became the first Enron executive to go to prison when he pleaded guilty to conspiracy to commit wire and securities fraud and was sentenced to five years. Glisan had participated directly in some of the SPE transactions orchestrated by Fastow. His guilty plea and cooperation with prosecutors helped build the government's case against higher-level executives."},
+ {date:"2004",phase:"aftermath",title:"Andrew Fastow pleads guilty",
+  short:"CFO pleads guilty. Sentenced to 6 years. Agrees to cooperate fully against Lay and Skilling.",
+  detail:"Andrew Fastow, the architect of the SPE fraud network, pleaded guilty to two counts of conspiracy in January 2004 and was sentenced to six years in prison. Crucially, he agreed to cooperate fully with prosecutors against Lay and Skilling — providing testimony and evidence about how the fraud was designed and who directed it. His cooperation was central to securing convictions against the two top executives."},
+ {date:"May 2006",phase:"aftermath",title:"Lay and Skilling convicted",
+  short:"Both found guilty on multiple counts of fraud and conspiracy after 4-month trial.",
+  detail:"After a four-month trial, Kenneth Lay was found guilty on 6 counts of fraud and conspiracy, and Jeffrey Skilling was found guilty on 19 counts of fraud, conspiracy, and insider trading. The verdict was handed down on May 25, 2006 — four and a half years after the bankruptcy. Both faced substantial prison sentences. The convictions were widely seen as a landmark moment for white-collar criminal accountability."},
+ {date:"Jul 2006",phase:"aftermath",title:"Kenneth Lay dies",
+  short:"Dies of heart attack in Colorado before sentencing. Conviction vacated.",
+  detail:"Kenneth Lay died of a massive heart attack on July 5, 2006, while vacationing in Colorado — just six weeks after his conviction and before he could be sentenced. Under US law, when a defendant dies before an appeal is concluded, the conviction is vacated (erased). This meant Lay died legally unconvicted, preventing the government from seizing his estate to pay victims."},
+ {date:"Oct 2006",phase:"aftermath",title:"Skilling sentenced to 24 years",
+  short:"Sentenced to 24 years and 4 months. Later reduced to 14 years after appeals.",
+  detail:"Jeffrey Skilling was sentenced to 24 years and 4 months in federal prison and ordered to pay $45 million in restitution to victims. After years of appeals, the Supreme Court overturned some of his convictions in 2010, leading to resentencing. In 2013, a deal was reached: his sentence was reduced to approximately 14 years, and $42 million previously frozen was released to Enron victim funds. Skilling was released from prison in February 2019."}
+];
+
+let tlBuilt=false;
+function buildTimeline(){
+  if(tlBuilt)return;
+  tlBuilt=true;
+  const container=document.getElementById("tl-events");
+  let lastYear="";
+  EVENTS.forEach((ev,i)=>{
+    const yr=(ev.date.match(/\d{4}/)||[""])[0];
+    if(yr!==lastYear){
+      lastYear=yr;
+      const ym=document.createElement("div");
+      ym.className="tl-year-marker";
+      ym.innerHTML=`<span>${yr}</span>`;
+      container.appendChild(ym);
+    }
+    const side=i%2===0?"left":"right";
+    const div=document.createElement("div");
+    div.className=`ev ${side} ph-${ev.phase}`;
+    div.innerHTML=`
+      <div class="ev-dot"></div>
+      <div class="ev-card" onclick="toggleEv(this)">
+        <div class="ev-date">${ev.date.toUpperCase()}</div>
+        <div class="ev-title">${ev.title}</div>
+        <div class="ev-short">${ev.short}</div>
+        <div class="ev-detail">${ev.detail}</div>
+        <span class="ev-toggle">+ Read more</span>
+      </div>`;
+    container.appendChild(div);
+  });
+}
+function toggleEv(card){
+  card.classList.toggle("expanded");
+  const tog=card.querySelector(".ev-toggle");
+  tog.textContent=card.classList.contains("expanded")?"- Read less":"+ Read more";
+}
+
+// ══════════════════════════════════════
+// STAKEHOLDER MAP
+// ══════════════════════════════════════
+const RAW={id:"enron",name:"Enron Corporation",type:"center",cat:"ctr",
+ role:"Energy company - Houston, TX",
+ detail:"Founded 1985 from merger of Houston Natural Gas and InterNorth. Rose to the 7th largest US company by revenue. Declared bankruptcy December 2, 2001.",
+ children:[
+  {id:"int",name:"INTERNAL",type:"cat",cat:"int",role:"People inside Enron",
+   detail:"All individuals employed by or governing Enron Corporation.",
+   children:[
+    {id:"ia",name:"Key Architects",type:"grp",cat:"int",role:"Designed and ran the fraud",detail:"The three executives who knowingly built the SPE fraud network.",
+     children:[
+      {id:"lay",name:"Kenneth Lay",role:"Chairman and CEO",cat:"int",key:1,detail:"Publicly declared the company healthy while privately selling millions in stock. Encouraged employees to buy Enron shares. Convicted 2006. Died before sentencing."},
+      {id:"ski",name:"Jeffrey Skilling",role:"President and COO / CEO",cat:"int",key:1,detail:"Built the rank-and-yank culture. Championed mark-to-market accounting. Resigned August 2001. Sentenced to 14 years."},
+      {id:"fas",name:"Andrew Fastow",role:"Chief Financial Officer",cat:"int",key:1,detail:"Engineered the SPE network. Personally profited from the structures. Became prosecution key witness. Sentenced to 6 years."},
+    ]},
+    {id:"ib",name:"Senior Executives",type:"grp",cat:"int",role:"C-suite and VP level",detail:"Senior leadership aware of or involved in Enrons practices.",
+     children:[
+      {id:"cau",name:"Richard Causey",role:"Chief Accounting Officer",cat:"int",detail:"Worked with Fastow on accounting structures. Pleaded guilty to securities fraud."},
+      {id:"gli",name:"Ben Glisan",role:"Treasurer",cat:"int",detail:"Participated in SPE transactions. First Enron executive jailed."},
+      {id:"bax",name:"Cliff Baxter",role:"Vice Chairman",cat:"int",detail:"Raised concerns internally. Resigned May 2001. Died by suicide January 2002."},
+      {id:"pai",name:"Lou Pai",role:"CEO Enron Energy Services",cat:"int",detail:"Sold $270M in Enron stock before collapse. Left June 2001."},
+      {id:"mar",name:"Rebecca Mark",role:"CEO Azurix water division",cat:"int",detail:"Led failed international expansion. Dabhol plant in India became symbol of Enrons overseas failures."},
+    ]},
+    {id:"ic",name:"Whistleblower",type:"grp",cat:"int",role:"The one internal voice that acted",detail:"The only person inside Enron who formally raised the alarm.",
+     children:[
+      {id:"wat",name:"Sherron Watkins",role:"Vice President Corporate Development",cat:"int",key:1,detail:"Wrote memo to Lay in August 2001 warning of implosion. Went to Lay not external regulators. Testified before Congress."},
+    ]},
+    {id:"id",name:"Governance",type:"grp",cat:"int",role:"Board oversight - largely failed",detail:"Responsible for shareholder oversight. Failed almost completely.",
+     children:[
+      {id:"bod",name:"Board of Directors",role:"Corporate governance body",cat:"int",detail:"Approved SPE structures after brief presentations. Members had financial conflicts of interest. Failed fiduciary duty."},
+      {id:"auc",name:"Audit Committee",role:"Financial oversight subcommittee",cat:"int",detail:"Approved complex structures without scrutiny. Led directly to SOX independence requirements."},
+      {id:"cop",name:"Compensation Committee",role:"Executive pay oversight",cat:"int",detail:"Approved massive stock-linked compensation creating incentives to inflate share price at any cost."},
+    ]},
+    {id:"ie",name:"Workforce",type:"grp",cat:"int",role:"29000 employees mostly victims",detail:"The broader Enron workforce. Most had no knowledge of the fraud.",
+     children:[
+      {id:"mgr",name:"Mid-level managers",role:"Deal teams and operations",cat:"int",detail:"Many executed instructions without full knowledge. Rank-and-yank culture made dissent career suicide."},
+      {id:"trd",name:"Energy traders",role:"Trading desks",cat:"int",detail:"Some deliberately manipulated California electricity markets. Recorded calls show them laughing about overcharging consumers."},
+      {id:"ana",name:"Financial analysts",role:"Modelling and reporting",cat:"int",detail:"Built financial models on data they were told to assume was accurate."},
+      {id:"emp",name:"All 29000 employees",role:"Peak workforce 2000 to 2001",cat:"int",detail:"Vast majority had no knowledge of the fraud. Lost jobs and pension savings when Enron filed for bankruptcy."},
+    ]}
+  ]},
+  {id:"act",name:"EXTERNAL ACTIVE",type:"cat",cat:"act",role:"Outside parties with influence",
+   detail:"Organizations and individuals outside Enron who had ability to affect or investigate the situation.",
+   children:[
+    {id:"aa",name:"Auditor",type:"grp",cat:"act",role:"External financial certification",detail:"Legally responsible for certifying Enrons financial statements.",
+     children:[
+      {id:"and",name:"Arthur Andersen LLP",role:"External auditor 1985 to 2001",cat:"act",key:1,detail:"Had full access to Enrons books for 16 years. Signed off on fraudulent statements. Ordered document shredding. 89000 employees worldwide lost jobs."},
+      {id:"dun",name:"David Duncan",role:"Lead Andersen partner on Enron",cat:"act",detail:"Ordered the shredding operation. Pleaded guilty to obstruction. Later cooperated with prosecutors."},
+      {id:"bas",name:"Carl Bass",role:"Andersen quality review partner",cat:"act",detail:"Raised concerns about Enrons accounting internally. Was removed from the engagement at Enrons request."},
+    ]},
+    {id:"ab",name:"Regulators and Law",type:"grp",cat:"act",role:"Government oversight and prosecution",detail:"Government bodies responsible for oversight and criminal prosecution.",
+     children:[
+      {id:"sec",name:"SEC",role:"Securities and Exchange Commission",cat:"act",detail:"Had access to Enrons filings for years. Failed to detect red flags. Launched investigation Oct 2001."},
+      {id:"doj",name:"Dept. of Justice",role:"Criminal prosecution",cat:"act",detail:"Created the dedicated Enron Task Force. Built criminal cases against Lay, Skilling, Fastow, and 20+ executives."},
+      {id:"fbi",name:"FBI",role:"Federal investigation",cat:"act",detail:"Part of the Enron Task Force. Conducted raids and seized documents."},
+      {id:"fer",name:"FERC",role:"Federal Energy Regulatory Commission",cat:"act",detail:"Investigated California market manipulation. Released trader recordings. Ordered $1.8B in refunds to California."},
+      {id:"con",name:"US Congress",role:"Senate and House investigations",cat:"act",detail:"Investigations led directly to Sarbanes-Oxley 2002. High-profile hearings featured Watkins testimony."},
+    ]},
+    {id:"ac",name:"Banks and Finance",type:"grp",cat:"act",role:"Funded and facilitated Enron",detail:"Financial institutions that helped Enron hide its debt.",
+     children:[
+      {id:"jpm",name:"JPMorgan Chase",role:"Major creditor structured finance",cat:"act",detail:"Structured Mahonia transactions to hide $3.7B in debt. Paid $2.2B in settlements."},
+      {id:"cit",name:"Citigroup",role:"Structured finance partner",cat:"act",detail:"Structured Yosemite transactions to disguise loans as commodity sales. Paid $2B in settlements."},
+      {id:"mer",name:"Merrill Lynch",role:"Investment bank",cat:"act",detail:"Nigerian barges deal allowed Enron to book $12M in fake profit. Four Merrill executives prosecuted."},
+      {id:"csf",name:"Credit Suisse First Boston",role:"Underwriter",cat:"act",detail:"Underwrote Enron bonds and equity offerings based on false financial statements."},
+    ]},
+    {id:"ad",name:"Legal and Credit",type:"grp",cat:"act",role:"Gave credibility to structures",detail:"Law firms and credit agencies whose approvals legitimized the fraud.",
+     children:[
+      {id:"ve",name:"Vinson and Elkins LLP",role:"Enrons primary law firm",cat:"act",detail:"Provided legal opinions blessing SPE structures. Internal investigation cleared Enron - later heavily criticized."},
+      {id:"ke",name:"Kirkland and Ellis LLP",role:"SPE structuring counsel",cat:"act",detail:"Helped structure some off-balance-sheet entities used to hide debt."},
+      {id:"moo",name:"Moodys and SP and Fitch",role:"Credit rating agencies",cat:"act",detail:"Maintained investment-grade ratings until 4 days before bankruptcy. Catastrophic failure of independent analysis."},
+    ]},
+    {id:"ae",name:"Media and Analysts",type:"grp",cat:"act",role:"Information gatekeepers",detail:"Analysts and journalists who celebrated, enabled, or exposed Enron.",
+     children:[
+      {id:"cha",name:"Jim Chanos Kynikos",role:"Short seller",cat:"act",key:1,detail:"Read Enrons SEC filings in 2000 and concluded it was a fraud. Began shorting November 2000 - over a year before collapse."},
+      {id:"mcl",name:"Bethany McLean",role:"Fortune journalist",cat:"act",key:1,detail:"Published Is Enron Overpriced in March 2001. Attacked by Skilling. Proved completely right."},
+      {id:"wsa",name:"Wall Street analysts",role:"Buy-side and sell-side research",cat:"act",detail:"16 of 17 analysts had Buy or Strong Buy ratings in October 2001. Catastrophic failure of independent analysis."},
+      {id:"pre",name:"Business press broadly",role:"Financial journalism",cat:"act",detail:"Fortune named Enron Most Innovative Company 6 years running without questioning its financial opacity."},
+    ]}
+  ]},
+  {id:"pas",name:"EXTERNAL PASSIVE",type:"cat",cat:"pas",role:"Affected but without influence",
+   detail:"Parties who had no power to affect the situation but suffered significant consequences.",
+   children:[
+    {id:"pa",name:"Financial Victims",type:"grp",cat:"pas",role:"Lost money directly",detail:"Individuals and institutions who lost financial value from the fraud.",
+     children:[
+      {id:"sha",name:"Individual shareholders",role:"Public stock investors",cat:"pas",key:1,detail:"Lost a combined $74 billion in stock value based on fraudulent disclosures."},
+      {id:"ins",name:"Institutional investors",role:"Pension funds mutual funds endowments",cat:"pas",detail:"Large funds holding Enron on behalf of millions of beneficiaries. Passed losses on to members."},
+      {id:"pen",name:"Employee pension holders",role:"401k retirement accounts",cat:"pas",key:1,detail:"$1.2B in retirement savings wiped out. Employees encouraged to hold Enron stock and locked from selling."},
+      {id:"bon",name:"Enron bondholders",role:"Debt investors",cat:"pas",detail:"Held Enron bonds expecting safe fixed income. Bonds became nearly worthless."},
+    ]},
+    {id:"pb",name:"Market Victims",type:"grp",cat:"pas",role:"Harmed by energy manipulation",detail:"Consumers and companies harmed by Enrons California electricity market manipulation.",
+     children:[
+      {id:"cal",name:"California consumers",role:"Electricity users 2000 to 2001",cat:"pas",key:1,detail:"Electricity prices rose 800% from Enron manipulation. Rolling blackouts hit millions. Traders recorded laughing about overcharging elderly consumers."},
+      {id:"pge",name:"PGandE",role:"Pacific Gas and Electric",cat:"pas",detail:"California largest utility driven to bankruptcy April 2001 by Enrons market manipulation."},
+      {id:"sce",name:"SoCal Edison",role:"Southern California Edison",cat:"pas",detail:"Second major California utility severely damaged. Rescued by state intervention."},
+      {id:"cag",name:"California state government",role:"State emergency response",cat:"pas",detail:"Electricity crisis contributed to Governor Gray Davis 2003 recall. State spent billions intervening."},
+    ]},
+    {id:"pc",name:"Collateral Victims",type:"grp",cat:"pas",role:"Innocent bystanders",detail:"People and institutions that suffered despite having no involvement in the fraud.",
+     children:[
+      {id:"aae",name:"Andersen employees",role:"89000 staff across 84 countries",cat:"pas",key:1,detail:"Vast majority had nothing to do with Enron. All 89000 lost jobs when firm surrendered CPA license."},
+      {id:"sup",name:"Enron suppliers and vendors",role:"Contractors and trade creditors",cat:"pas",detail:"Companies with unpaid invoices when bankruptcy was filed. Many were small businesses."},
+      {id:"hou",name:"Houston community",role:"Enrons home city",cat:"pas",detail:"Enron was one of Houstons largest employers and philanthropic donors. Collapse affected local employment and civic institutions."},
+      {id:"ind",name:"Communities in India",role:"Dabhol power plant Maharashtra",cat:"pas",detail:"Enrons $3B Dabhol project collapsed leaving communities without promised electricity infrastructure."},
+      {id:"bra",name:"Communities in Brazil",role:"International water and energy projects",cat:"pas",detail:"Failed international ventures left broken promises and economic disruption in local communities."},
+    ]},
+    {id:"pd",name:"Systemic Impact",type:"grp",cat:"pas",role:"Long-term institutional changes",detail:"Broader systems permanently changed by the Enron collapse.",
+     children:[
+      {id:"pub",name:"Investing public broadly",role:"Public trust in markets",cat:"pas",detail:"Combined with WorldCom and other 2002 scandals Enron severely damaged public confidence in financial reporting for years."},
+      {id:"acc",name:"Accounting profession",role:"Standards and oversight",cat:"pas",detail:"Led to creation of PCAOB. Auditors of public companies now face independent oversight rather than self-regulation."},
+      {id:"ceo",name:"Future executives",role:"Criminal liability via SOX",cat:"pas",detail:"CEO and CFO personal certification of financials now legally required. False certification up to 20 years prison."},
+      {id:"sox",name:"Sarbanes-Oxley Act 2002",role:"US corporate governance reform",cat:"pas",detail:"Drafted in response to Enron and WorldCom. Reshaped corporate governance audit independence and whistleblower protection across all US public companies."},
+    ]}
+  ]}
+ ]
+};
+
+const DUR=500,NH=52,VG=14,HS=265,NW=[140,154,168,198];
+const PAL={ctr:{f:"#6B0010",s:"#C0002A",n:"#FFD0D0",r:"#C08080",bb:"#8B0012",bt:"#FFD0D0"},int:{f:"#0C1A42",s:"#2A4898",n:"#B8D0F5",r:"#6888B8",bb:"#1C2B5A",bt:"#B5D4F4"},act:{f:"#062E22",s:"#0F8060",n:"#88DEB8",r:"#448868",bb:"#0F6E56",bt:"#9FE1CB"},pas:{f:"#160E40",s:"#5048B0",n:"#C0B8F8",r:"#7068C0",bb:"#534AB7",bt:"#CECBF6"}};
+const GP={ctr:{f:"#7A0012",s:"#E24B4A"},int:{f:"#162850",s:"#4068B8"},act:{f:"#0A4838",s:"#20A880"},pas:{f:"#241870",s:"#7068D0"}};
+const LP={ctr:{f:"#8B0018",s:"#FF6060"},int:{f:"#1A3568",s:"#5888D8"},act:{f:"#0D5C40",s:"#30C898"},pas:{f:"#2E2090",s:"#9088E8"}};
+function getP(d){return PAL[d.data.cat]||PAL.ctr}
+function nw(d){return NW[Math.min(d.depth,NW.length-1)]}
+function fill(d){if(d.data.key)return "#620018";const t=d.data.type;if(t==="cat")return getP(d).f;if(t==="grp")return (GP[d.data.cat]||GP.ctr).f;return (LP[d.data.cat]||LP.ctr).f;}
+function strok(d){if(d.data.key)return "#E24B4A";const t=d.data.type;if(t==="cat")return getP(d).s;if(t==="grp")return (GP[d.data.cat]||GP.ctr).s;return (LP[d.data.cat]||LP.ctr).s;}
+function nFill(d){if(d.data.key)return "#FFA0A0";return getP(d).n}
+function rFill(d){if(d.data.key)return "#D08080";return getP(d).r}
+function trunc(s,n){return s&&s.length>n?s.slice(0,n-1)+"...":s||""}
+function bez(sx,sy,tx,ty){const mx=(sx+tx)/2;return `M${sx},${sy} C${mx},${sy} ${mx},${ty} ${tx},${ty}`}
+
+let svgSel,gSel,zmObj,treeLayout,rootNode,mapUid=0;
+
+function initMap(){
+  const W=window.innerWidth,H=window.innerHeight-52-44;
+  svgSel=d3.select("#chart");
+  gSel=svgSel.append("g");
+  zmObj=d3.zoom().scaleExtent([0.1,4]).on("zoom",e=>gSel.attr("transform",e.transform));
+  svgSel.call(zmObj);
+  svgSel.on("click",()=>{document.getElementById("mpanel").style.display="none";});
+  treeLayout=d3.tree().nodeSize([NH+VG,HS]).separation((a,b)=>a.parent===b.parent?1:1.35);
+  rootNode=d3.hierarchy(RAW);
+  rootNode.descendants().forEach(d=>{d._id=++mapUid;d._x0=0;d._y0=0;if(d.data.type==="grp"){d._ch=d.children;d.children=null;}});
+  updateMap(rootNode);
+  const W2=window.innerWidth,H2=window.innerHeight-52;
+  svgSel.call(zmObj.transform,d3.zoomIdentity.translate(W2*0.04,H2/2).scale(0.7));
+}
+
+function updateMap(src){
+  treeLayout(rootNode);
+  const nodes=rootNode.descendants(),links=rootNode.links();
+  const link=gSel.selectAll("path.lk").data(links,d=>d.target._id);
+  const le=link.enter().append("path").attr("class","lk link").attr("stroke",d=>strok(d.target)).attr("stroke-opacity",0.3).attr("stroke-width",d=>d.target.data.type==="cat"?2:1.2).attr("d",()=>bez(src._y0+nw(src),src._x0,src._y0+nw(src),src._x0));
+  link.merge(le).transition().duration(DUR).attr("stroke",d=>strok(d.target)).attr("stroke-opacity",0.3).attr("stroke-width",d=>d.target.data.type==="cat"?2:1.2).attr("d",d=>bez(d.source.y+nw(d.source),d.source.x,d.target.y,d.target.x));
+  link.exit().transition().duration(DUR).attr("d",()=>bez(src.y+nw(src),src.x,src.y+nw(src),src.x)).remove();
+  const node=gSel.selectAll("g.nd").data(nodes,d=>d._id);
+  const ne=node.enter().append("g").attr("class","nd node").attr("transform",()=>`translate(${src._y0},${src._x0})`).on("click",(ev,d)=>{ev.stopPropagation();if(d.children||d._ch){d._x0=d.x;d._y0=d.y;if(d.children){d._ch=d.children;d.children=null;}else{d.children=d._ch;d._ch=null;}updateMap(d);}showMPanel(d);});
+  ne.append("rect").attr("x",0).attr("y",-NH/2).attr("width",d=>nw(d)).attr("height",NH).attr("fill",d=>fill(d)).attr("stroke",d=>strok(d)).attr("stroke-width",d=>d.data.key?1.8:0.8).attr("stroke-opacity",0.75).attr("opacity",0);
+  ne.append("text").attr("class","tname").attr("dominant-baseline","central").attr("fill",d=>nFill(d)).attr("opacity",0);
+  ne.append("text").attr("class","trole").attr("dominant-baseline","central").attr("fill",d=>rFill(d)).attr("opacity",0);
+  ne.append("text").attr("class","ticon").attr("dominant-baseline","central").attr("fill",d=>nFill(d)).attr("opacity",0.7);
+  const nm=node.merge(ne);
+  nm.transition().duration(DUR).attr("transform",d=>`translate(${d.y},${d.x})`);
+  nm.select("rect").transition().duration(DUR).attr("opacity",1).attr("width",d=>nw(d)).attr("fill",d=>fill(d)).attr("stroke",d=>strok(d));
+  nm.select(".tname").transition().duration(DUR).attr("opacity",1).attr("font-size",11).attr("font-weight",d=>(d.data.type==="cat"||d.data.type==="grp"||d.data.key)?"500":"400").attr("x",d=>{if(d.depth===0)return nw(d)/2;return (d.children||d._ch)?22:11;}).attr("y",d=>d.depth===0||!d.data.role?0:-8).attr("text-anchor",d=>d.depth===0?"middle":"start").text(d=>{const a=Math.floor((nw(d)-34)/6.8);return trunc(d.data.name,Math.max(a,8));});
+  nm.select(".trole").transition().duration(DUR).attr("opacity",d=>d.data.role?0.82:0).attr("font-size",9.5).attr("x",d=>{if(d.depth===0)return nw(d)/2;return (d.children||d._ch)?22:11;}).attr("y",10).attr("text-anchor",d=>d.depth===0?"middle":"start").text(d=>{if(!d.data.role)return "";const a=Math.floor((nw(d)-34)/5.8);return trunc(d.data.role,Math.max(a,8));});
+  nm.select(".ticon").transition().duration(DUR).attr("opacity",d=>(d.children||d._ch)?0.75:0).attr("font-size",15).attr("font-weight","300").attr("x",7).attr("y",0).text(d=>d._ch?"plus":d.children&&d.depth>0?"minus":"").text(d=>d._ch?"+":d.children&&d.depth>0?"-":"");
+  node.exit().transition().duration(DUR).attr("transform",`translate(${src.y},${src.x})`).remove();
+  nodes.forEach(d=>{d._x0=d.x;d._y0=d.y;});
+}
+
+function showMPanel(d){
+  const p=getP(d);
+  const cats={ctr:"Enron Corporation",int:"Internal",act:"External Active",pas:"External Passive"};
+  const badge=document.getElementById("pb");
+  badge.textContent=cats[d.data.cat||"ctr"]||"";
+  badge.style.background=p.bb;badge.style.color=p.bt;
+  document.getElementById("pn").textContent=d.data.name;
+  document.getElementById("pr").textContent=d.data.role||"";
+  document.getElementById("pd").textContent=d.data.detail||"";
+  document.getElementById("mpanel").style.display="block";
+}
+window.expandAll=function(){rootNode.descendants().forEach(d=>{if(d._ch){d.children=d._ch;d._ch=null;}});updateMap(rootNode);};
+window.collapseAll=function(){rootNode.descendants().forEach(d=>{if(d.depth>0&&d.children){d._ch=d.children;d.children=null;}});updateMap(rootNode);};
+window.resetView=function(){const W=window.innerWidth,H=window.innerHeight-52;svgSel.transition().duration(600).call(zmObj.transform,d3.zoomIdentity.translate(W*0.04,H/2).scale(0.7));};
+document.addEventListener("keydown",e=>{if(e.key==="Escape")document.getElementById("mpanel").style.display="none";});
+
+// Init map on load since it starts visible
+window.addEventListener("load",()=>{initMap();mapReady=true;});
+</script>
+</body>
+</html>
